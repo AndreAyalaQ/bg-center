@@ -1,0 +1,36 @@
+name: CI
+
+# Placeholder pipeline — see docs/design.md § CI (GitHub Actions) for the target shape:
+#   every push:        lint (ruff, eslint), type checks (mypy, tsc), unit tests, secret scan
+#   pull_request:       the above, plus the eval suite on data/sample, results posted as a PR comment
+#   merge to main:      frontend/backend auto-deploy via the hosts' GitHub integrations (no job needed here)
+#
+# Steps are commented out until backend/ and frontend/ have real code and dependency manifests.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: placeholder
+        run: echo "CI not yet implemented — see docs/design.md and CLAUDE.md"
+      # - name: Lint backend (ruff)
+      #   run: ruff check backend
+      # - name: Type check backend (mypy)
+      #   run: mypy backend
+      # - name: Lint frontend (eslint)
+      #   run: npm --prefix frontend run lint
+      # - name: Type check frontend (tsc)
+      #   run: npm --prefix frontend run typecheck
+      # - name: Unit tests
+      #   run: pytest backend/tests
+      # - name: Secret scan
+      #   uses: trufflesecurity/trufflehog@main
+      # - name: Eval suite (sample data, PRs only)
+      #   if: github.event_name == 'pull_request'
+      #   run: python evals/run.py --data data/sample --golden evals/sample_golden.yaml
