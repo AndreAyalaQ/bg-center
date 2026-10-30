@@ -35,3 +35,14 @@ Use both, for different purposes:
 - Switching LLM provider or model is a config change plus an eval re-run, not a deploy of new code paths.
 - Local dev behavior (Ollama) can diverge slightly from production (hosted model) — the eval set is what validates production behavior before each release, not local testing alone.
 - A provider deprecating the chosen model is an explicit risk (see `docs/design.md` § Risks), mitigated by the fallback provider and by re-running evals before switching.
+
+## Update — 2026-10-30: embeddings runtime
+
+Building the ingestion pipeline (`backend/app/ingest/`) required picking not just a model but a runtime to execute it. The first pass used `sentence-transformers` with `intfloat/multilingual-e5-small`, which pulls in `torch` as a transitive dependency — a CPU-only build still costs ~540MB on its own, and the full `backend/.venv` came to **1.8GB** for what is, at this project's scale, a single small embedding model running on CPU. For a 10-user hobby MVP, that's a disproportionate footprint.
+
+**Switched to `fastembed`** (Qdrant's ONNX Runtime-based embedding library) with `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` — no torch at all, `backend/.venv` drops to **614MB**. Two knock-on effects of the swap:
+
+- `intfloat/multilingual-e5-small` isn't in fastembed's model catalog (only the 2.24GB `multilingual-e5-large` is) — so the model itself changed, not just the runtime. MiniLM-L12-v2 still satisfies ADR-0001's "small multilingual model" requirement (384-dim, ~220MB, 50+ languages including Portuguese) and is *symmetric* (queries and passages embedded the same way), unlike e5's asymmetric "query: "/"passage: " prefix convention — simpler to use correctly.
+- Verified against the sample group (`data/sample/members/`): single-fact and cross-lingual recall are solid in general (correct top-1 member for PT and EN queries, across every member except one). The one gap found: a PT single-fact city query for Tomás fails to surface him in the top-3 at all, because his name also appears in the planted cross-member "Porto trip" story told from Rita's and Joana's docs — this model's retrieval is more easily diluted by that cross-mention than e5-small's was. This is a genuine recall-quality cost of the lighter model, not a bug; it's exactly the kind of gap the eval suite (`evals/`, ADR-0005) exists to catch and that top-k/model tuning in step 9 should address with real measurement rather than guesswork.
+
+Embeddings model choice stays config-driven (`EMBEDDINGS_MODEL` in `.env.example`), so swapping back to an e5-class model later — if evals show the recall gap matters in practice — is a config change, not a rewrite.
