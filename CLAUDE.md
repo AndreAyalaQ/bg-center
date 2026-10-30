@@ -42,9 +42,9 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [ ] First real member doc written and approved by that friend, pushed to `bg-center-data` (consent process starts here, not at the end — see `docs/design.md` § Privacy and safety)
 
 ### 2. Backend skeleton
-- [ ] FastAPI app in `backend/` boots locally (`uvicorn`), health check endpoint
-- [ ] Config loaded from environment (`.env`, see `.env.example`) — model name, base URL, `DATA_DIR`, secrets; nothing hardcoded (ADR-0001)
-- [ ] Dependency manifest (`pyproject.toml` or `requirements.txt`) and lint/type-check config (ruff, mypy) added
+- [x] FastAPI app in `backend/` boots locally (`uvicorn`), `/health` endpoint — verified: boots, responds `{"status":"ok",...}`, CORS echoes only the configured `FRONTEND_ORIGIN`
+- [x] Config loaded from environment (`.env`, see `.env.example`) — model name, base URL, `DATA_DIR`, secrets; nothing hardcoded (ADR-0001). `app/config.py`, pydantic-settings
+- [x] Dependency manifest (`backend/pyproject.toml`) and lint/type-check config (ruff, mypy) added — `pytest`, `ruff check`, `mypy` all pass clean
 
 ### 3. Ingestion
 - [ ] Parser: Markdown + YAML frontmatter → structured facts + list of `##` sections (ADR-0004)
