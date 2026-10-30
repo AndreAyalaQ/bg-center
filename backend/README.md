@@ -12,7 +12,7 @@ backend/
 │   └── ingest/
 │       ├── parser.py        Markdown + YAML frontmatter → Member/Section (ADR-0004)
 │       ├── chunker.py        Member -> embeddable Chunks, incl. the synthesized facts chunk
-│       ├── embeddings.py      Wraps paraphrase-multilingual-MiniLM-L12-v2 via fastembed/ONNX (ADR-0001)
+│       ├── embeddings.py      Wraps intfloat/multilingual-e5-small, CPU-only (ADR-0001)
 │       └── index.py           In-memory Chroma collection, built at startup
 ├── tests/
 └── pyproject.toml
@@ -27,7 +27,7 @@ python3 -m venv .venv
 cp ../.env.example ../.env   # fill in values; loaded from the repo root
 ```
 
-The embeddings stack (`fastembed` + `chromadb`) installs in well under a minute, no `torch` — `.venv` lands around 600MB. (An earlier pass used `sentence-transformers` + torch, which alone cost 1.8GB; see the "Update" note in `docs/decisions/0001-llm-and-embeddings.md` for why that was dropped.) The embedding model itself (~220MB) downloads from the Hugging Face Hub on first use and is cached afterward.
+The embeddings stack (`sentence-transformers` + CPU-only `torch` + `chromadb`) is a real install — expect roughly 1–2GB of downloads and disk, and the CPU build of torch specifically (`--extra-index-url https://download.pytorch.org/whl/cpu`) to avoid pulling in CUDA. The embedding model itself (~470MB) downloads from the Hugging Face Hub on first use and is cached afterward.
 
 ## Run
 
