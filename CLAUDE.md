@@ -47,10 +47,10 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [x] Dependency manifest (`backend/pyproject.toml`) and lint/type-check config (ruff, mypy) added — `pytest`, `ruff check`, `mypy` all pass clean
 
 ### 3. Ingestion
-- [ ] Parser: Markdown + YAML frontmatter → structured facts + list of `##` sections (ADR-0004)
-- [ ] Chunker: one chunk per section, split only past ~400 tokens; member-name prefix before embedding; `member`/`section`/`source_file` metadata per chunk
-- [ ] One synthesized "facts" chunk per member, rendered from frontmatter
-- [ ] Embeddings model picked from the ADR-0001 shortlist, loaded on CPU; in-memory Chroma index built at startup from `DATA_DIR`
+- [x] Parser (`app/ingest/parser.py`): Markdown + YAML frontmatter → structured facts + list of `##` sections (ADR-0004). PT and EN headings (e.g. "Histórias"/"Stories") collapse to the same language-independent slug via `slugify_section`
+- [x] Chunker (`app/ingest/chunker.py`): one chunk per section, split past ~400 tokens (≈1600 chars, paragraph-boundary split); every chunk prefixed with first name + nickname before embedding; `member`/`section`/`source_file` on every chunk
+- [x] One synthesized "facts" chunk per member, rendered from frontmatter (`render_facts`) — fields absent from frontmatter are omitted, not guessed at, so the `unanswerable` eval trap (e.g. Diogo's missing `pets`) stays genuinely unanswerable
+- [x] Embeddings model picked from the ADR-0001 shortlist (`intfloat/multilingual-e5-small`, set via `EMBEDDINGS_MODEL`), loaded on CPU (`app/ingest/embeddings.py`); in-memory Chroma index built at startup from `DATA_DIR` (`app/ingest/index.py`, wired into FastAPI's lifespan in `app/main.py`) — verified live: 31 chunks indexed from the 6 sample members, sane top-k recall on single-fact and cross-lingual queries, and the "who has cats" aggregate query reproduces the expected false-positive (Tomás is allergic, not an owner) that motivates the v2 `query_facts` tool
 
 ### 4. Chat pipeline
 - [ ] Query rewrite: last 4 turns → standalone question
