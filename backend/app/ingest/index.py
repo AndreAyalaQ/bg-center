@@ -69,6 +69,20 @@ class MemberIndex:
     def size(self) -> int:
         return len(self._chunks_by_id)
 
+    def all_chunks(self) -> list[RetrievedChunk]:
+        """Every chunk, unranked — for the stuff-everything baseline (ADR-0005)."""
+        return [
+            RetrievedChunk(
+                chunk_id=chunk.id,
+                text=chunk.text,
+                member=chunk.member,
+                section=chunk.section,
+                source_file=chunk.source_file,
+                score=1.0,
+            )
+            for chunk in self._chunks_by_id.values()
+        ]
+
     def query(self, text: str, k: int = 5) -> list[RetrievedChunk]:
         if not self._chunks_by_id:
             return []

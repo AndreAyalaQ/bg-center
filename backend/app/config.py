@@ -8,13 +8,21 @@ never hardcoded, since provider catalogs and model choices change.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# .env lives at the repo root (see .env.example there), not in backend/ —
+# resolved relative to this file rather than the process's cwd, since
+# uvicorn is normally launched from inside backend/.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_REPO_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # LLM provider (ADR-0001)
     llm_provider: str = "groq"

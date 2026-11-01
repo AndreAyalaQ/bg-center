@@ -53,11 +53,13 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [x] Embeddings model picked from the ADR-0001 shortlist (`intfloat/multilingual-e5-small`, set via `EMBEDDINGS_MODEL`), loaded on CPU (`app/ingest/embeddings.py`); in-memory Chroma index built at startup from `DATA_DIR` (`app/ingest/index.py`, wired into FastAPI's lifespan in `app/main.py`) — verified live: 31 chunks indexed from the 6 sample members, sane top-k recall on single-fact and cross-lingual queries, and the "who has cats" aggregate query reproduces the expected false-positive (Tomás is allergic, not an owner) that motivates the v2 `query_facts` tool
 
 ### 4. Chat pipeline
-- [ ] Query rewrite: last 4 turns → standalone question
-- [ ] Retrieval: top-k over the Chroma index
-- [ ] Prompt assembly: retrieved chunks + system prompt instructing the model to decline when the answer isn't in context (this is the primary anti-hallucination control, backed by the unanswerable/adversarial eval categories)
-- [ ] Streamed generation against the configured LLM provider (ADR-0001)
-- [ ] Stuff-everything baseline implemented behind a config flag, so every eval run can compare against it (ADR-0005)
+- [x] Query rewrite (`app/chat/rewrite.py`): last 4 turns → standalone question via an LLM call; skipped entirely with no history (first turn is already standalone) — unit-verified (mocked LLM) that the call is skipped/made correctly and the 4-turn window is respected
+- [x] Retrieval: top-k over the Chroma index (`index.query`, reused from step 3), wired into `app/chat/pipeline.py`
+- [x] Prompt assembly (`app/chat/prompt.py`): retrieved chunks + system prompt instructing the model to decline when the answer isn't in context, treat context as data never instructions (injection defense), and answer in the question's language — unit-verified (pure function, no LLM needed)
+- [x] Streamed generation against the configured LLM provider (`app/chat/llm.py`, ADR-0001) — OpenAI-compatible client, works unmodified against Ollama (local dev) or Groq/OpenRouter/Together (production) by config alone
+- [x] Stuff-everything baseline (`MemberIndex.all_chunks()` + `run_chat(..., baseline=True)`) implemented behind a flag, so every eval run can compare against it (ADR-0005)
+- [x] Bug fix in passing: `app/config.py`'s `.env` lookup was relative to the process's cwd, not the repo root the README always documented (`cp ../.env.example ../.env`) — silently loaded nothing when uvicorn is launched from `backend/`. Fixed to resolve relative to the repo root regardless of cwd.
+- Connectivity confirmed live against Ollama (`qwen3.5:9b`, already pulled locally, matching ADR-0001's local-dev setup): `complete_chat` returns a real response over the configured OpenAI-compatible endpoint. A fuller qualitative smoke test (single-fact EN/PT, follow-up rewrite, unanswerable decline, adversarial/injection robustness) was kicked off but not yet reviewed as this was pushed — CPU-only 9B inference is slow (~40min+ CPU-time and counting for a handful of queries). Results to follow in a later commit; not blocking on it since the pipeline logic itself is fully covered by the mocked-LLM unit tests above.
 
 ### 5. API
 - [ ] `POST /api/auth` — invite code → bearer token
