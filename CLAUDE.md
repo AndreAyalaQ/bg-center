@@ -67,6 +67,8 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [ ] `POST /api/chat` — SSE stream of `token` events, then `done` with `sources`
 - [ ] `POST /api/feedback` — thumbs rating (+ optional comment), `204`
 - [ ] CORS locked to the frontend origin from day one
+- [ ] Request/response bodies as pydantic `BaseModel`s (idiomatic FastAPI — validation + OpenAPI schema for free)
+- [ ] Bundle in: pydantic validation for member frontmatter in `app/ingest/parser.py` (currently only checks `"id"` is present — nothing validates `birthday` is a real date, `height_cm` is numeric, etc.; deferred here per discussion, do both together)
 
 ### 6. Frontend
 - [ ] React + TypeScript app in `frontend/`: invite gate, member strip, chat view, sources display, thumbs up/down
