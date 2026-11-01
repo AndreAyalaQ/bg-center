@@ -98,6 +98,15 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [ ] README's eval results table filled in with real baseline-vs-RAG numbers
 - [ ] Tag `v1.0`
 
+## Retrieval quality backlog (not gated to v1)
+
+Pure dense-vector retrieval (current state) is a reasonable first pass, not the ceiling of what's possible — see the "Is this the gold standard?" discussion in `docs/decisions/0001-llm-and-embeddings.md`'s revert note. Two concrete upgrades to pick up once the eval runner (step 9) exists to actually measure them, rather than adopting on faith:
+
+- **Hybrid retrieval (BM25 + dense).** Add a sparse/keyword index (e.g. `rank_bm25` or similar) alongside the existing Chroma dense index, and combine both result sets (e.g. reciprocal rank fusion) before taking top-k. Dense embeddings blur on exact names/nicknames — we already saw this directly: the Tomás PT city-query recall miss (ADR-0001's revert note) happened because his name is semantically diluted by appearing in other members' "Porto trip" story chunks, which is exactly the kind of exact-match case BM25 is strong at and dense retrieval is weak at. The `lookalike` eval category (João/Joana, Pi/Pipo) is likely to benefit the same way.
+- **Reranking.** Retrieve a wider candidate set cheaply (e.g. top-20 via hybrid search), then rerank down to the final top-k with a cross-encoder (e.g. a small multilingual reranker like `bge-reranker-v2-m3` or similar). Cross-encoders score query+passage jointly rather than via separate embeddings, which is typically the single biggest retrieval-quality lever in production RAG systems — at the cost of being too slow to run over the full corpus, hence "retrieve wide, rerank narrow."
+
+**Gate:** implement behind a config flag (same pattern as the stuff-everything baseline), and only keep enabled by default if the golden-set eval run shows a measurable improvement over plain dense retrieval — consistent with ADR-0005's "always compared against the baseline" philosophy, extended to compare hybrid+reranked vs dense-only. Whichever one lands first gets its own ADR with real before/after eval numbers, per this project's normal convention — this backlog entry isn't that ADR.
+
 ## Roadmap after v1 (summary — detail in `docs/design.md` § Roadmap to agent)
 
 | Phase | Starts when | Adds |
