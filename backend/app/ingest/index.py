@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.ingest.chunker import Chunk, chunk_members
 from app.ingest.embeddings import DEFAULT_MODEL, get_embeddings
-from app.ingest.parser import load_members
+from app.ingest.parser import Member, load_members
 
 
 class RetrievedChunk(BaseModel):
@@ -37,6 +37,7 @@ class MemberIndex:
     def __init__(self, data_dir: Path, model_name: str = DEFAULT_MODEL) -> None:
         self.data_dir = data_dir
         self.model_name = model_name
+        self.members: list[Member] = []
         self._chunks_by_id: dict[str, Chunk] = {}
         # Each index gets its own collection name — chromadb's default
         # in-process client shares collection state process-wide, so two
@@ -50,8 +51,8 @@ class MemberIndex:
         self._build()
 
     def _build(self) -> None:
-        members = load_members(self.data_dir)
-        chunks = chunk_members(members)
+        self.members = load_members(self.data_dir)
+        chunks = chunk_members(self.members)
         self._chunks_by_id = {chunk.id: chunk for chunk in chunks}
         if not chunks:
             return

@@ -65,13 +65,16 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [x] Bug fix found during the injection test: Ollama's default 4096-token context was being exhausted by Qwen3.5's internal reasoning before any visible answer appeared (confirmed via raw-response inspection, not a prompt/code bug — `complete_chat`/`stream_chat` already read the right field). Added `LLM_NUM_CTX` config (`Settings.llm_num_ctx` → `app/chat/llm.py`'s `extra_body={"options": {"num_ctx": ...}}`), local-dev-only (0/unset does nothing, so Groq/OpenRouter/Together are unaffected); `LLM_NUM_CTX=16384` resolves it. Full writeup in `docs/decisions/0001-llm-and-embeddings.md`'s "Update — 2026-11-01".
 
 ### 5. API
-- [ ] `POST /api/auth` — invite code → bearer token
-- [ ] `GET /api/members` — member list for the UI strip
-- [ ] `POST /api/chat` — SSE stream of `token` events, then `done` with `sources`
-- [ ] `POST /api/feedback` — thumbs rating (+ optional comment), `204`
-- [ ] CORS locked to the frontend origin from day one
-- [ ] Request/response bodies as pydantic `BaseModel`s (idiomatic FastAPI — validation + OpenAPI schema for free)
-- [ ] Bundle in: pydantic validation for member frontmatter in `app/ingest/parser.py` (currently only checks `"id"` is present — nothing validates `birthday` is a real date, `height_cm` is numeric, etc.; deferred here per discussion, do both together)
+- [x] `POST /api/auth` — invite code → bearer token (`app/api/auth.py`, JWT HS256, 7-day TTL)
+- [x] `GET /api/members` — member list for the UI strip (`app/api/routes.py`, backed by `MemberIndex.members`)
+- [x] `POST /api/chat` — SSE stream of `token` events, then `done` with `sources`; history kept per-conversation in an interim in-memory store (`app/api/store.py`, placeholder until Postgres — step 8) so follow-up query rewrite actually has turns to work with
+- [x] `POST /api/feedback` — thumbs rating (+ optional comment), `204`
+- [x] CORS locked to the frontend origin (done in step 2, confirmed still correct)
+- [x] Request/response bodies as pydantic `BaseModel`s (`app/api/schemas.py`) — shared `CamelModel` base (`alias_generator=to_camel`) handles the camelCase wire format (`inviteCode`, `conversationId`, ...) from snake_case Python fields
+- [x] Bundled in: pydantic validation for member frontmatter (`MemberFrontmatter` in `app/ingest/parser.py`) — validates `id`/`name`/`nickname`/`birthday`/`city`/`job`/`pets`/`diet`/`height_cm` types, `extra="allow"` so future ad hoc fields (`avatar_url`, `tagline`) don't need a schema change; validate-then-discard, `Member.meta` stays a plain dict so no downstream code changed
+- Every endpoint except `/api/auth` requires the bearer token (`require_token` dependency) — the "enforced on every endpoint" half of step 11's privacy checklist is done here, not deferred; rate limiting and the rest of step 11 remain separate
+- `stream_chat` (ADR-0001) is a blocking sync generator; `StreamingResponse` auto-detects this and runs it via Starlette's `iterate_in_threadpool`, so a slow LLM call doesn't block the event loop for other requests — confirmed via Starlette source, not assumed, before deciding an async rewrite wasn't needed
+- Verified live end-to-end against the real server (not just mocked tests): `POST /api/auth` with wrong/correct invite code, `GET /api/members` returns the 6-member sample group with camelCase `avatarUrl`, `POST /api/feedback` returns `204`, and `POST /api/chat` streamed a correct real answer ("He lives in Lisboa.") from live Ollama through the full stack (API → pipeline → retrieval → LLM → SSE), with a valid `done` event (`conversationId`, `messageId`, `sources` correctly topped by João's facts chunk)
 
 ### 6. Frontend
 - [ ] React + TypeScript app in `frontend/`: invite gate, member strip, chat view, sources display, thumbs up/down
@@ -95,7 +98,7 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - [ ] Auto-deploy wired through each host's GitHub integration on merge to `main`
 
 ### 11. Privacy and access
-- [ ] Invite-code → short-lived token flow enforced on every endpoint except `/api/auth`
+- [x] Invite-code → short-lived token flow enforced on every endpoint except `/api/auth` (done as part of step 5 — see `require_token` there)
 - [ ] Rate limiting per token
 - [ ] Group told explicitly that chats are logged and admin-readable; Langfuse trace retention set to 30 days
 - [ ] Doc/chunk removal path exists for any member who asks

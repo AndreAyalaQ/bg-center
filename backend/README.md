@@ -1,6 +1,6 @@
 # backend
 
-FastAPI app and RAG pipeline. Ingestion and the chat pipeline (query rewrite, retrieval, grounded generation, stuff-everything baseline) are built; the API endpoints are not yet — see `docs/design.md` and the root `CLAUDE.md` build plan (step 5).
+FastAPI app and RAG pipeline. Ingestion, the chat pipeline, and the API endpoints are built; the frontend (step 6) is not yet — see `docs/design.md` and the root `CLAUDE.md` build plan.
 
 ## Layout
 
@@ -14,11 +14,16 @@ backend/
 │   │   ├── chunker.py        Member -> embeddable Chunks, incl. the synthesized facts chunk
 │   │   ├── embeddings.py      LangChain HuggingFaceEmbeddings wrapper, e5 prefix convention (ADR-0001, ADR-0006)
 │   │   └── index.py           LangChain Chroma vectorstore, in-memory, built at startup (ADR-0006)
-│   └── chat/
-│       ├── llm.py             OpenAI-compatible client — Ollama locally, Groq/OpenRouter/Together in prod (ADR-0001)
-│       ├── rewrite.py          Last-4-turns -> standalone question
-│       ├── prompt.py            Grounded-answer system prompt (decline + injection defense)
-│       └── pipeline.py           Orchestrates rewrite -> retrieve -> prompt -> stream
+│   ├── chat/
+│   │   ├── llm.py             OpenAI-compatible client — Ollama locally, Groq/OpenRouter/Together in prod (ADR-0001)
+│   │   ├── rewrite.py          Last-4-turns -> standalone question
+│   │   ├── prompt.py            Grounded-answer system prompt (decline + injection defense)
+│   │   └── pipeline.py           Orchestrates rewrite -> retrieve -> prompt -> stream
+│   └── api/
+│       ├── schemas.py          Request/response pydantic BaseModels, camelCase on the wire
+│       ├── auth.py              Invite-code -> JWT; require_token dependency
+│       ├── store.py              In-memory conversation/feedback store (placeholder until Postgres, step 8)
+│       └── routes.py              /api/auth, /api/members, /api/chat (SSE), /api/feedback
 ├── tests/
 └── pyproject.toml
 ```
@@ -48,6 +53,10 @@ For local chat pipeline development, point `LLM_BASE_URL` at a running Ollama in
 ```
 
 `indexed_chunks` confirms the startup ingestion actually ran: parse `DATA_DIR` → chunk → embed → build the in-memory index.
+
+Interactive API docs (OpenAPI, generated from the pydantic schemas) at `http://127.0.0.1:8000/docs`. Every endpoint except `POST /api/auth` requires `Authorization: Bearer <token>`, obtained by posting `INVITE_CODE` to `/api/auth`.
+
+Conversation and feedback storage is in-memory (`app/api/store.py`) until Postgres lands (step 8) — history and feedback don't survive a restart yet.
 
 ## Checks
 

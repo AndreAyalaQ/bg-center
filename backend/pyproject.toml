@@ -13,6 +13,7 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-huggingface>=0.1",
     "langchain-chroma>=0.1",
+    "pyjwt>=2.9",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +38,11 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends()/Query()/etc. in argument defaults is the documented,
+# correct idiom, not the mutable-default-argument bug B008 flags.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
 
 [tool.mypy]
 python_version = "3.11"

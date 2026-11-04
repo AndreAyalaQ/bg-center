@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 # PT and EN headings used across the sample docs collapse to the same
 # language-independent slug, so `expected_section` in the eval cases
@@ -49,6 +50,28 @@ class Section(BaseModel):
     body: str  # section text with the heading line removed
 
 
+class MemberFrontmatter(BaseModel):
+    """Validates the known, typed frontmatter fields (ADR-0004).
+
+    `extra="allow"` so future ad hoc fields (e.g. `avatar_url`, `tagline`)
+    don't need a schema change here to be accepted — this exists to catch
+    wrong *types* on the fields we do know about (a typo'd `height_cm`, an
+    unparsable `birthday`), not to lock down the whole schema.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    name: str
+    nickname: str | None = None
+    birthday: date | None = None
+    city: str | None = None
+    job: str | None = None
+    pets: list[str] | None = None
+    diet: str | None = None
+    height_cm: int | None = None
+
+
 class Member(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -67,6 +90,10 @@ def parse_member(path: Path) -> Member:
     meta = yaml.safe_load(raw_front)
     if not isinstance(meta, dict) or "id" not in meta:
         raise ValueError(f"{path.name}: frontmatter missing 'id'")
+    try:
+        MemberFrontmatter.model_validate(meta)
+    except ValidationError as exc:
+        raise ValueError(f"{path.name}: invalid frontmatter: {exc}") from exc
 
     headings = list(_HEADING_RE.finditer(body))
     sections = []

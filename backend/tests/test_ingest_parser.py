@@ -42,6 +42,36 @@ def test_parse_member_rejects_file_without_frontmatter(tmp_path: Path) -> None:
         parse_member(bad)
 
 
+def test_parse_member_rejects_wrong_typed_fields(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.md"
+    bad.write_text(
+        "---\nid: bad\nname: Bad Example\nheight_cm: not-a-number\n---\n\n## Stories\n\nHi.\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="invalid frontmatter"):
+        parse_member(bad)
+
+
+def test_parse_member_rejects_missing_name(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.md"
+    bad.write_text("---\nid: bad\n---\n\n## Stories\n\nHi.\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid frontmatter"):
+        parse_member(bad)
+
+
+def test_parse_member_allows_unrecognized_extra_fields(tmp_path: Path) -> None:
+    # extra="allow" on MemberFrontmatter: ad hoc fields like avatar_url or
+    # tagline shouldn't need a schema change here to be accepted.
+    ok = tmp_path / "ok.md"
+    ok.write_text(
+        "---\nid: ok\nname: Ok Example\navatar_url: https://example.com/a.png\n---\n\n"
+        "## Stories\n\nHi.\n",
+        encoding="utf-8",
+    )
+    member = parse_member(ok)
+    assert member.meta["avatar_url"] == "https://example.com/a.png"
+
+
 def test_load_members_reads_the_whole_sample_group() -> None:
     members = load_members(SAMPLE_DIR)
     assert {m.id for m in members} == {"joao", "joana", "rita", "tomas", "ines", "diogo"}
