@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_base_url: str = ""
     judge_llm_model: str = ""
+    # Ollama-specific context window override. 0 = unset, use the
+    # provider's default. Needed locally: Ollama's default 4096-token
+    # context can be exhausted by a thinking-enabled model's internal
+    # reasoning before it produces a visible answer — see the "Update"
+    # note in docs/decisions/0001-llm-and-embeddings.md. Hosted providers
+    # (Groq etc.) size their own context and ignore/ don't need this.
+    llm_num_ctx: int = 0
 
     # Embeddings (ADR-0001)
     embeddings_model: str = ""
