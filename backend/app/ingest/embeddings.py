@@ -1,32 +1,39 @@
 """Embedding model wrapper — a small multilingual model, run on CPU (ADR-0001).
 
-intfloat/multilingual-e5-small is the small end of ADR-0001's shortlist:
-free, private, and fast enough for the dataset size expected at this scale
-(docs/design.md § LLM and embeddings). e5 models expect a "query: " /
-"passage: " prefix on the input text — that's part of how the model was
-trained, not a project convention.
+Built on LangChain (ADR-0006): `HuggingFaceEmbeddings` wraps the same
+`intfloat/multilingual-e5-small` sentence-transformers model as before.
+e5 models expect a "query: "/"passage: " prefix on the input text — that's
+part of how the model was trained, not something LangChain's generic
+wrapper knows about, so `E5Embeddings` adds it.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 
-from sentence_transformers import SentenceTransformer
+from langchain_core.embeddings import Embeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 DEFAULT_MODEL = "intfloat/multilingual-e5-small"
 
 
+class E5Embeddings(Embeddings):
+    """Adds e5's "query: "/"passage: " prefix convention around a HuggingFace embedder."""
+
+    def __init__(self, model_name: str = DEFAULT_MODEL) -> None:
+        self._model = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True},
+        )
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._model.embed_documents([f"passage: {text}" for text in texts])
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._model.embed_query(f"query: {text}")
+
+
 @lru_cache
-def _model(name: str) -> SentenceTransformer:
-    return SentenceTransformer(name, device="cpu")
-
-
-def embed_passages(texts: list[str], model_name: str = DEFAULT_MODEL) -> list[list[float]]:
-    model = _model(model_name)
-    prefixed = [f"passage: {text}" for text in texts]
-    return model.encode(prefixed, normalize_embeddings=True).tolist()  # type: ignore[no-any-return]
-
-
-def embed_query(text: str, model_name: str = DEFAULT_MODEL) -> list[float]:
-    model = _model(model_name)
-    return model.encode(f"query: {text}", normalize_embeddings=True).tolist()  # type: ignore[no-any-return]
+def get_embeddings(model_name: str = DEFAULT_MODEL) -> E5Embeddings:
+    return E5Embeddings(model_name)

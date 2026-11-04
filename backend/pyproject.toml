@@ -6,11 +6,13 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "pyyaml>=6.0",
-    "sentence-transformers>=3.0",
-    "chromadb>=0.5",
     "openai>=1.50",
+    "langchain-core>=0.3",
+    "langchain-huggingface>=0.1",
+    "langchain-chroma>=0.1",
 ]
 
 [project.optional-dependencies]

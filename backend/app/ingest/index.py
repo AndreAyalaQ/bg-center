@@ -2,24 +2,27 @@
 
 docs/design.md § Storage: "In-memory Chroma, built at startup" for the MVP —
 the dataset is tiny and ephemeral disks don't matter because it's rebuilt
-every time the process starts.
+every time the process starts. Built on LangChain's Chroma vectorstore
+(ADR-0006) rather than calling chromadb directly.
 """
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
 
-import chromadb
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+from pydantic import BaseModel, ConfigDict
 
 from app.ingest.chunker import Chunk, chunk_members
-from app.ingest.embeddings import DEFAULT_MODEL, embed_passages, embed_query
+from app.ingest.embeddings import DEFAULT_MODEL, get_embeddings
 from app.ingest.parser import load_members
 
 
-@dataclass(frozen=True)
-class RetrievedChunk:
+class RetrievedChunk(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     chunk_id: str
     text: str
     member: str
@@ -29,17 +32,20 @@ class RetrievedChunk:
 
 
 class MemberIndex:
-    """An in-memory Chroma collection over one data directory's chunks."""
+    """An in-memory LangChain Chroma vectorstore over one data directory's chunks."""
 
     def __init__(self, data_dir: Path, model_name: str = DEFAULT_MODEL) -> None:
         self.data_dir = data_dir
         self.model_name = model_name
         self._chunks_by_id: dict[str, Chunk] = {}
-        # chromadb.Client() shares collection state process-wide, so each
-        # index needs its own collection name to avoid colliding with any
-        # other MemberIndex built in the same process (e.g. in tests).
-        self._collection = chromadb.Client().create_collection(
-            name=f"members-{uuid.uuid4().hex}", metadata={"hnsw:space": "cosine"}
+        # Each index gets its own collection name — chromadb's default
+        # in-process client shares collection state process-wide, so two
+        # MemberIndex instances in the same process (e.g. in tests) would
+        # otherwise collide on "members".
+        self._vectorstore = Chroma(
+            collection_name=f"members-{uuid.uuid4().hex}",
+            embedding_function=get_embeddings(model_name),
+            collection_metadata={"hnsw:space": "cosine"},
         )
         self._build()
 
@@ -49,7 +55,6 @@ class MemberIndex:
         self._chunks_by_id = {chunk.id: chunk for chunk in chunks}
         if not chunks:
             return
-        embeddings = embed_passages([c.text for c in chunks], self.model_name)
 
         def metadata(chunk: Chunk) -> dict[str, str]:
             return {
@@ -58,12 +63,11 @@ class MemberIndex:
                 "source_file": chunk.source_file,
             }
 
-        self._collection.add(
-            ids=[c.id for c in chunks],
-            embeddings=embeddings,  # type: ignore[arg-type]
-            documents=[c.text for c in chunks],
-            metadatas=[metadata(c) for c in chunks],
-        )
+        documents = [
+            Document(page_content=chunk.text, metadata=metadata(chunk), id=chunk.id)
+            for chunk in chunks
+        ]
+        self._vectorstore.add_documents(documents, ids=[c.id for c in chunks])
 
     @property
     def size(self) -> int:
@@ -86,16 +90,12 @@ class MemberIndex:
     def query(self, text: str, k: int = 5) -> list[RetrievedChunk]:
         if not self._chunks_by_id:
             return []
-        query_embedding = embed_query(text, self.model_name)
-        result = self._collection.query(
-            query_embeddings=[query_embedding],  # type: ignore[arg-type]
-            n_results=min(k, len(self._chunks_by_id)),
-        )
-        ids = result["ids"][0]
-        distances = (result["distances"] or [[]])[0]
+        k = min(k, len(self._chunks_by_id))
+        results = self._vectorstore.similarity_search_with_score(text, k=k)
         retrieved = []
-        for chunk_id, distance in zip(ids, distances, strict=True):
-            chunk = self._chunks_by_id[chunk_id]
+        for document, distance in results:
+            assert document.id is not None
+            chunk = self._chunks_by_id[document.id]
             retrieved.append(
                 RetrievedChunk(
                     chunk_id=chunk.id,

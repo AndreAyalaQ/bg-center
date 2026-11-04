@@ -21,6 +21,9 @@ DEFAULT_K = 5
 
 @dataclass
 class ChatResult:
+    # Stays a plain dataclass rather than pydantic (ADR-0006): `tokens` is
+    # a live, one-shot Iterator[str] of streaming output, not data to
+    # validate or serialize, which is what pydantic models are for.
     standalone_question: str
     sources: list[RetrievedChunk]
     tokens: Iterator[str]

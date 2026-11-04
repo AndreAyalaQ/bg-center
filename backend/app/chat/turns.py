@@ -1,10 +1,12 @@
-from dataclasses import dataclass
 from typing import Literal
+
+from pydantic import BaseModel, ConfigDict
 
 Role = Literal["user", "assistant"]
 
 
-@dataclass(frozen=True)
-class ChatTurn:
+class ChatTurn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     role: Role
     content: str

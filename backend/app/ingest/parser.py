@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel, ConfigDict
 
 # PT and EN headings used across the sample docs collapse to the same
 # language-independent slug, so `expected_section` in the eval cases
@@ -41,15 +41,17 @@ def slugify_section(heading: str) -> str:
     return slug or "section"
 
 
-@dataclass(frozen=True)
-class Section:
+class Section(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     heading: str  # heading text as written in the doc
     slug: str  # language-independent identifier, e.g. "stories"
     body: str  # section text with the heading line removed
 
 
-@dataclass(frozen=True)
-class Member:
+class Member(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     id: str
     meta: dict[str, Any]  # full YAML frontmatter
     sections: list[Section]

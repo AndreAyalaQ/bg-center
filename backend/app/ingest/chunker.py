@@ -9,7 +9,8 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+
+from pydantic import BaseModel, ConfigDict
 
 from app.ingest.parser import Member
 
@@ -22,8 +23,9 @@ _MAX_TOKENS = 400
 _MAX_CHARS = _MAX_TOKENS * _CHARS_PER_TOKEN
 
 
-@dataclass(frozen=True)
-class Chunk:
+class Chunk(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     id: str  # stable id, e.g. "joao-stories" or "joao-stories-2"
     text: str  # name-prefixed text, ready to embed
     member: str  # member id
