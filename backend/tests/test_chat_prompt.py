@@ -28,6 +28,18 @@ def test_system_prompt_warns_against_instructions_hidden_in_context() -> None:
     assert "never instructions" in messages[0]["content"] or "data, never" in messages[0]["content"]
 
 
+def test_system_prompt_scopes_the_model_to_the_current_message_only() -> None:
+    # Regression: with conversation history present, the model conflated
+    # "answer the current question" with "account for everyone discussed
+    # earlier in the conversation" and appended an unprompted "I don't have
+    # information about X" for people mentioned only in prior turns, not
+    # the current question. The prompt must explicitly rule this out.
+    messages = build_messages("q", [], [_chunk()])
+    system = messages[0]["content"]
+    assert "most recent message" in system
+    assert "unprompted" in system
+
+
 def test_empty_context_uses_placeholder_not_empty_string() -> None:
     messages = build_messages("Where does Jota live?", [], [])
     assert "no matching member information" in messages[0]["content"]
