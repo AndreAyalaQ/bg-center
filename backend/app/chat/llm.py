@@ -20,12 +20,12 @@ Message = dict[str, str]
 
 
 @lru_cache
-def _client(base_url: str, api_key: str) -> OpenAI:
-    return OpenAI(base_url=base_url or None, api_key=api_key or "not-needed")
+def _client(base_url: str, api_key: str, timeout: float) -> OpenAI:
+    return OpenAI(base_url=base_url or None, api_key=api_key or "not-needed", timeout=timeout)
 
 
 def _client_for(settings: Settings) -> OpenAI:
-    return _client(settings.llm_base_url, settings.llm_api_key)
+    return _client(settings.llm_base_url, settings.llm_api_key, settings.llm_timeout_seconds)
 
 
 def _extra_body(settings: Settings) -> dict[str, object] | None:

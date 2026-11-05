@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # note in docs/decisions/0001-llm-and-embeddings.md. Hosted providers
     # (Groq etc.) size their own context and ignore/ don't need this.
     llm_num_ctx: int = 0
+    # Request timeout for the OpenAI-compatible client. The SDK's own
+    # default (600s) is too short for a thinking-enabled model on local
+    # CPU-only Ollama — observed single calls taking 20-40+ minutes this
+    # session, which raised openai.APITimeoutError. 600 matches the SDK
+    # default so hosted providers (Groq etc.) are unaffected unless raised.
+    llm_timeout_seconds: float = 600
 
     # Embeddings (ADR-0001)
     embeddings_model: str = ""

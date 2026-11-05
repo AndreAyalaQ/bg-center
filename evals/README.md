@@ -9,9 +9,16 @@ A fixed set of questions with known answers, used to measure the chatbot every t
 | `sample_golden.yaml` | Hand-written cases: stories, follow-ups, lookalikes, unanswerable, adversarial, injection | Yes |
 | `generate_fact_questions.py` | Reads member frontmatter, writes fact and aggregate cases with computed answers, validates all cases | Yes |
 | `sample_golden.generated.yaml` | Output of the generator | No, regenerate it |
-| `run.py` | Runs the cases through the pipeline and grades them | *Not built yet* |
+| `cases.py` | Pydantic `GoldenCase` schema + loader, merges both golden files | Yes |
+| `metrics.py` | Retrieval metrics: Mean Reciprocal Rank, nDCG, keyword coverage | Yes |
+| `retrieval_eval.py` | Runs `metrics.py` across the golden set against a `MemberIndex` | Yes |
+| `judge.py` | LLM-as-judge: scores a generated answer 0–5 on Accuracy/Completeness/Relevance | Yes |
+| `generation_eval.py` | Runs the full chat pipeline per case, then `judge.py` | Yes |
+| `eval_ui.py` | Gradio dashboard over the above — see § Usage | Yes |
 
 All cases here use the fictional group in `data/sample/`. Real-data cases live in the private `bg-center-data` repo and use the same format.
+
+No `evals/run.py` CLI exists yet — the runner logic lives in the modules above (and `evals/eval_ui.py` for interactive use). A thin CLI wrapper calling the same functions is a reasonable addition if a non-interactive/CI path is needed later.
 
 ## Categories
 
@@ -51,14 +58,21 @@ Every case needs at least one of `must_contain`, `must_contain_any`, `expect_dec
 
 ## How cases are graded
 
-Checks run cheapest first, and a case fails on the first check it fails.
+Two independent tracks, cheapest first:
 
-1. **Retrieval recall@k.** Were the chunks of every `expected_members` id in the top-k? Deterministic, no LLM.
-2. **String checks.** `must_contain`, `must_contain_any`, `must_not_contain`; case- and accent-insensitive, so "Ines" matches "Inês".
-3. **Decline check.** For `expect_decline`, a judge model decides whether the answer says it doesn't know.
-4. **Rubric.** For `judge_rubric`, a judge model scores the answer against the rubric. The judge is a different, stronger model than the one answering.
+**Retrieval quality** (`metrics.py`, `retrieval_eval.py`) — no LLM generation needed, just embeddings + vector search:
+- **Mean Reciprocal Rank.** 1/rank of the first retrieved chunk whose `member` is in `expected_members`; 0 if none found.
+- **nDCG.** Binary relevance (member match), normalized against the ideal ordering of the *same retrieved set* — there's no corpus-wide relevance judgment, only per-case `expected_members`.
+- **Keyword coverage.** Fraction of `must_contain`/`must_contain_any` found in the *retrieved chunk text* (not the generated answer) — case- and accent-insensitive, so "Ines" matches "Inês".
+- Cases with `expected_members: []` (most `adversarial`/`injection` cases — there's no "correct person" to retrieve for "list everyone's address") are excluded from the MRR/nDCG average, not scored as 0.
+- A `follow_up` case's `question` is a raw fragment ("And what does he do?"); when a `Settings` is passed, it's rewritten to a standalone question with the *same model being evaluated* first, matching what production actually does — skipping this would make follow-up retrieval look artificially weak for a reason that has nothing to do with retrieval.
 
-Every run is compared against the stuff-everything baseline, where all member docs go into the prompt with no retrieval.
+**Generation quality** (`judge.py`, `generation_eval.py`) — runs the full pipeline, then an LLM judge (a different, stronger model than the one answering, via `JUDGE_LLM_MODEL`) scores the answer 0–5 on:
+- **Accuracy** — factually correct per the retrieved context (or, for `expect_decline` cases, correctly declines instead of inventing).
+- **Completeness** — covers all aspects of the question and all relevant info in the context/`judge_rubric`.
+- **Relevance** — directly answers the question asked, no padding or unrelated information.
+
+Compare against the stuff-everything baseline (all member docs in the prompt, no retrieval) by toggling the baseline flag/checkbox and re-running — not yet automatic in one run.
 
 ## Usage
 
@@ -77,11 +91,25 @@ python evals/generate_fact_questions.py \
   --hand-written ../bg-center-data/golden.yaml
 ```
 
-Run the evals once `run.py` exists (planned interface):
+Interactive dashboard (retrieval metrics + LLM-judge generation scoring), from the repo root:
 
 ```bash
-python evals/run.py --data data/sample/members --mode rag --k 5
-python evals/run.py --data data/sample/members --mode baseline
+backend/.venv/bin/python -m evals.eval_ui
+# -> http://127.0.0.1:7860
+```
+
+Needs the `ui` extra: `cd backend && .venv/bin/pip install -e ".[ui]"`. The generation panel runs a full pipeline + judge call per case — slow against a local CPU model; use the category filter and "Max cases" to iterate quickly, and prefer a hosted provider (Groq) for a full run.
+
+Or call the runner functions directly, e.g. in a notebook or script (from the repo root, using `backend/.venv/bin/python`):
+
+```python
+from pathlib import Path
+from app.ingest.index import MemberIndex
+from evals.retrieval_eval import run_retrieval_eval
+
+index = MemberIndex(Path("data/sample/members"))
+report = run_retrieval_eval(index, k=5)
+print(report.mean_reciprocal_rank, report.mean_ndcg, report.mean_keyword_coverage)
 ```
 
 ## Adding a case

@@ -24,9 +24,12 @@ backend/
 │       ├── auth.py              Invite-code -> JWT; require_token dependency
 │       ├── store.py              In-memory conversation/feedback store (placeholder until Postgres, step 8)
 │       └── routes.py              /api/auth, /api/members, /api/chat (SSE), /api/feedback
+├── chat_ui.py              Gradio chat tester — calls run_chat() directly, no server/auth needed
 ├── tests/
 └── pyproject.toml
 ```
+
+The eval dashboard (`evals/eval_ui.py`, retrieval metrics + LLM-judge generation scoring) lives alongside the golden set in `evals/` — see `evals/README.md`.
 
 Data classes (`Member`, `Section`, `Chunk`, `RetrievedChunk`, `ChatTurn`) are pydantic `BaseModel`s, not `@dataclass` (ADR-0006) — the one exception is `ChatResult` in `pipeline.py`, which carries a live streaming `Iterator[str]` that doesn't fit pydantic's validate/serialize model.
 
@@ -58,12 +61,25 @@ Interactive API docs (OpenAPI, generated from the pydantic schemas) at `http://1
 
 Conversation and feedback storage is in-memory (`app/api/store.py`) until Postgres lands (step 8) — history and feedback don't survive a restart yet.
 
+### Dev tools (Gradio)
+
+```bash
+.venv/bin/pip install -e ".[ui]"   # gradio + pandas, kept out of the main deps
+.venv/bin/python chat_ui.py                  # -> http://127.0.0.1:7861, simple chat tester
+cd .. && backend/.venv/bin/python -m evals.eval_ui   # -> http://127.0.0.1:7860, eval dashboard
+```
+
+`chat_ui.py` calls `run_chat()` directly in the same process — no need for `uvicorn` to also be running, no auth token to manage. `evals.eval_ui` must run as a module (`-m`) from the repo root so `evals` resolves as a package; see `evals/README.md`.
+
 ## Checks
 
 ```bash
 .venv/bin/pytest
+.venv/bin/pytest ../evals -q   # evals package has its own tests
 .venv/bin/ruff check .
-.venv/bin/mypy .
+.venv/bin/ruff check ../evals
+.venv/bin/mypy               # no path arg — pyproject.toml's `files` covers app, tests, chat_ui.py, and ../evals;
+                              # passing an explicit path (e.g. `mypy .`) overrides that config and skips evals
 ```
 
 Config (LLM provider/model, embeddings model, `DATA_DIR`, Postgres, Langfuse, invite code, `FRONTEND_ORIGIN` for CORS) comes entirely from environment variables, never hardcoded — see `app/config.py` and `.env.example` at the repo root.

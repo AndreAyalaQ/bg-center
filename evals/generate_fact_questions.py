@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -31,7 +32,7 @@ CITY_ALIASES = {
 }
 
 
-def load_members(data_dir: Path) -> list[dict]:
+def load_members(data_dir: Path) -> list[dict[str, Any]]:
     members = []
     for path in sorted(data_dir.glob("*.md")):
         text = path.read_text(encoding="utf-8")
@@ -46,18 +47,19 @@ def load_members(data_dir: Path) -> list[dict]:
     return members
 
 
-def first(m: dict) -> str:
-    return m["name"].split()[0]
+def first(m: dict[str, Any]) -> str:
+    name: str = m["name"].split()[0]
+    return name
 
 
-def names(ms: list[dict]) -> list[str]:
+def names(ms: list[dict[str, Any]]) -> list[str]:
     return [first(m) for m in ms]
 
 
-def per_member(m: dict) -> list[dict]:
+def per_member(m: dict[str, Any]) -> list[dict[str, Any]]:
     mid, fn, nick = m["id"], first(m), m["nickname"]
     city = m["city"]
-    out = [
+    out: list[dict[str, Any]] = [
         {
             "id": f"fact-city-{mid}",
             "category": "single_fact",
@@ -123,7 +125,7 @@ def per_member(m: dict) -> list[dict]:
     return out
 
 
-def aggregates(ms: list[dict]) -> list[dict]:
+def aggregates(ms: list[dict[str, Any]]) -> list[dict[str, Any]]:
     all_ids = [m["id"] for m in ms]
     by_bday = sorted(ms, key=lambda m: m["birthday"])
     by_height = sorted(ms, key=lambda m: m["height_cm"])
@@ -192,7 +194,7 @@ def aggregates(ms: list[dict]) -> list[dict]:
     ]
 
 
-def check(cases: list[dict], member_ids: set[str]) -> None:
+def check(cases: list[dict[str, Any]], member_ids: set[str]) -> None:
     ids = Counter(c["id"] for c in cases)
     dupes = [i for i, n in ids.items() if n > 1]
     if dupes:
@@ -201,7 +203,8 @@ def check(cases: list[dict], member_ids: set[str]) -> None:
         unknown = set(c.get("expected_members", [])) - member_ids
         if unknown:
             raise SystemExit(f"{c['id']}: unknown members {unknown}")
-        if not any(k in c for k in ("must_contain", "must_contain_any", "expect_decline", "judge_rubric")):
+        gradable_keys = ("must_contain", "must_contain_any", "expect_decline", "judge_rubric")
+        if not any(k in c for k in gradable_keys):
             raise SystemExit(f"{c['id']}: no way to grade it")
 
 
@@ -221,11 +224,17 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    hand = yaml.safe_load(args.hand_written.read_text(encoding="utf-8")) if args.hand_written.exists() else []
+    hand: list[dict[str, Any]] = []
+    if args.hand_written.exists():
+        hand = yaml.safe_load(args.hand_written.read_text(encoding="utf-8"))
     all_cases = hand + generated
     check(all_cases, {m["id"] for m in members})
 
-    print(f"{len(members)} members · {len(generated)} generated · {len(hand)} hand-written · {len(all_cases)} total")
+    summary = (
+        f"{len(members)} members · {len(generated)} generated · "
+        f"{len(hand)} hand-written · {len(all_cases)} total"
+    )
+    print(summary)
     for cat, n in sorted(Counter(c["category"] for c in all_cases).items()):
         print(f"  {cat:<14} {n}")
     print(f"wrote {args.out.relative_to(ROOT) if args.out.is_relative_to(ROOT) else args.out}")

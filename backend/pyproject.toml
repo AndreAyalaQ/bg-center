@@ -23,6 +23,14 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
     "types-PyYAML>=6.0",
+    "pandas-stubs>=2.0",
+]
+# Dev/testing tools (CLAUDE.md step 9's eval dashboard, the chat test UI)
+# — not part of the production FastAPI service, so kept out of the main
+# dependency list.
+ui = [
+    "gradio>=6",
+    "pandas>=2",
 ]
 
 [build-system]
@@ -40,11 +48,19 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.flake8-bugbear]
-# FastAPI's Depends()/Query()/etc. in argument defaults is the documented,
-# correct idiom, not the mutable-default-argument bug B008 flags.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+# FastAPI's Depends()/Query()/etc., and Gradio's Progress(), in argument
+# defaults are the documented, correct idiom, not the mutable-default-
+# argument bug B008 flags.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "gradio.Progress",
+]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["app", "tests"]
+files = ["app", "tests", "chat_ui.py", "../evals"]
+mypy_path = ".."
