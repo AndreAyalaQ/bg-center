@@ -113,12 +113,18 @@ def run_retrieval_panel(
 
 
 def _generation_chart(report: GenerationReport) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "dimension": ["Accuracy", "Completeness", "Relevance"],
-            "score": [report.mean_accuracy, report.mean_completeness, report.mean_relevance],
-        }
-    )
+    scores = [report.mean_accuracy, report.mean_completeness, report.mean_relevance]
+    if all(s == 0 for s in scores):
+        # Gradio/Vega-Lite edge case, confirmed by direct testing: a bar
+        # chart where every value is exactly 0 renders as full-height bars
+        # with a degenerate single-tick ("0") axis instead of empty bars on
+        # a 0-5 scale — any other all-equal value (e.g. all 3.0) renders
+        # correctly, so this is specifically about zero, not y_lim in
+        # general. Nudging to a tiny epsilon keeps the bars visually empty
+        # (indistinguishable from true 0 at this scale) while avoiding the
+        # degenerate-domain rendering path. Table values are unaffected.
+        scores = [1e-6, 1e-6, 1e-6]
+    return pd.DataFrame({"dimension": ["Accuracy", "Completeness", "Relevance"], "score": scores})
 
 
 def _generation_table(report: GenerationReport) -> pd.DataFrame:
