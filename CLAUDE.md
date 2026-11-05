@@ -77,8 +77,9 @@ Gate to v2: all boxes below checked, plus `docs/design.md` § "Definition of don
 - Verified live end-to-end against the real server (not just mocked tests): `POST /api/auth` with wrong/correct invite code, `GET /api/members` returns the 6-member sample group with camelCase `avatarUrl`, `POST /api/feedback` returns `204`, and `POST /api/chat` streamed a correct real answer ("He lives in Lisboa.") from live Ollama through the full stack (API → pipeline → retrieval → LLM → SSE), with a valid `done` event (`conversationId`, `messageId`, `sources` correctly topped by João's facts chunk)
 
 ### 6. Frontend
-- [ ] React + TypeScript app in `frontend/`: invite gate, member strip, chat view, sources display, thumbs up/down
-- [ ] SSE consumption via plain `fetch` (no websockets), matching the backend contract
+- [x] React + TypeScript app in `frontend/` (Vite, React 19, oxlint): invite gate, member strip, chat view, sources display, thumbs up/down
+- [x] SSE consumption via plain `fetch` (no websockets) — `EventSource` can't send the `Authorization` header the bearer-token flow needs, so `src/api/client.ts`'s `streamChat()` is a hand-rolled async generator parsing `event:`/`data:` lines off a `ReadableStream`
+- Verified live end-to-end against the real backend + local Ollama, not just `tsc`/lint/build: invite gate correctly rejects a wrong code and accepts the real one; member strip loads all 6 sample members with fallback-initials avatars; a real message streams in token-by-token ("Jota lives in Lisboa."); the sources `<details>` panel expands to show real member/section/snippet data, top-ranked by João's facts chunk; thumbs-up highlights and disables both buttons after one vote; a follow-up ("And what does he do for work?") correctly resolves "he" to João via the backend's query-rewrite step and answers "He works as a physiotherapist." — conversation continuity (conversationId) confirmed working through the browser, not just in backend tests. No console errors
 
 ### 7. Observability
 - [ ] Langfuse Cloud (EU region) wired in; one trace per chat request, with request/query-rewrite/retrieval/generation/feedback spans per `docs/design.md` § Trace contents
