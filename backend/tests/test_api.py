@@ -102,6 +102,34 @@ def test_chat_requires_auth(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_chat_rejects_an_empty_message(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    response = client.post("/api/chat", json={"message": ""}, headers=auth_headers)
+    assert response.status_code == 422
+
+
+def test_chat_rejects_a_message_over_the_length_limit(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        "/api/chat", json={"message": "x" * 2001}, headers=auth_headers
+    )
+    assert response.status_code == 422
+
+
+def test_chat_accepts_a_message_at_the_length_limit(
+    client: TestClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        pipeline_module, "stream_chat", lambda messages, settings: iter(["ok"])
+    )
+    response = client.post(
+        "/api/chat", json={"message": "x" * 2000}, headers=auth_headers
+    )
+    assert response.status_code == 200
+
+
 def test_chat_streams_tokens_then_a_done_event(
     client: TestClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

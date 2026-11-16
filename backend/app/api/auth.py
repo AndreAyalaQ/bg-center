@@ -21,10 +21,22 @@ TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days — a group of friends, not a ban
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def _signing_key(settings: Settings) -> str:
+    """Refuse to sign or verify with an empty key.
+
+    PyJWT happily HMACs with b"" — an unset JWT_SECRET wouldn't fail
+    loudly, it would just make every token forgeable by anyone who
+    guesses the key is empty. Fail fast instead.
+    """
+    if not settings.jwt_secret:
+        raise RuntimeError("JWT_SECRET is not set — see .env.example")
+    return settings.jwt_secret
+
+
 def issue_token(settings: Settings) -> str:
     now = int(time.time())
     payload = {"iat": now, "exp": now + TOKEN_TTL_SECONDS, "jti": uuid.uuid4().hex}
-    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+    return jwt.encode(payload, _signing_key(settings), algorithm="HS256")
 
 
 def require_token(
@@ -34,6 +46,6 @@ def require_token(
     if credentials is None:
         raise HTTPException(status_code=401, detail="Missing bearer token")
     try:
-        jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=["HS256"])
+        jwt.decode(credentials.credentials, _signing_key(settings), algorithms=["HS256"])
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc

@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
+
+MAX_MESSAGE_LENGTH = 2000
 
 
 class CamelModel(BaseModel):
@@ -36,7 +38,7 @@ class MemberOut(CamelModel):
 
 
 class ChatRequest(CamelModel):
-    message: str
+    message: str = Field(min_length=1, max_length=MAX_MESSAGE_LENGTH)
     conversation_id: str | None = None
 
 

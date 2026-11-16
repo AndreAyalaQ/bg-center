@@ -14,6 +14,9 @@ function tempId(): string {
   return `pending-${tempIdCounter}`;
 }
 
+// Matches backend/app/api/schemas.py's ChatRequest.message max_length.
+const MAX_MESSAGE_LENGTH = 2000;
+
 export function ChatView({ token, onUnauthorized }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -107,6 +110,7 @@ export function ChatView({ token, onUnauthorized }: ChatViewProps) {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           disabled={isSending}
+          maxLength={MAX_MESSAGE_LENGTH}
           autoFocus
         />
         <button type="submit" disabled={isSending || !input.trim()}>
